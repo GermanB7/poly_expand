@@ -4,27 +4,31 @@ from poly_expand.algebra.term import Term
 def term_to_str(term: Term) -> str:
     parts = []
     coeff = term.coeff
-    # Coeficiente 1 o -1
-    if term.exponents and abs(coeff) == 1:
-        coeff_str = "-" if coeff < 0 else ""
+
+    # Si el coeficiente es ±1 y hay variables, lo omitimos o solo ponemos '-'
+    if term.exponents:
+        if coeff == -1:
+            coeff_str = "-"
+        elif coeff == 1:
+            coeff_str = ""
+        else:
+            coeff_str = str(coeff)
     else:
         coeff_str = str(coeff)
+
     parts.append(coeff_str)
-    # Variables ordenadas
+
     for var, exp in sorted(term.exponents.items()):
-        if exp == 0:
-            continue
         if exp == 1:
             parts.append(var)
         else:
-            parts.append(f"{var}^{{{exp}}}")
+            parts.append(f"{var}^{exp}")  # sin llaves
     return "".join(parts)
+
+
 
 def polynomial_to_latex(poly: Polynomial) -> str:
     if not poly.terms:
         return "0"
-    latex_parts = []
-    for term in poly.terms:
-        latex_parts.append(term_to_str(term))
-    expr = " + ".join(latex_parts)
-    return expr.replace("+ -", "- ")
+    latex_parts = [term_to_str(term) for term in poly.terms]
+    return " + ".join(latex_parts).replace("+ -", "- ")

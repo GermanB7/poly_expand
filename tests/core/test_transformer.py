@@ -1,6 +1,7 @@
 import pytest
 from poly_expand.core.parser import parse
 from poly_expand.core.transformer import to_polynomial
+from poly_expand.ast.nodes import Node
 
 
 def test_transform_expand_basic():
