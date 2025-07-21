@@ -1,0 +1,11 @@
+Metadata-Version: 2.4
+Name: poly_expand
+Version: 0.1.0
+Summary: Expansión de productos de polinomios a polinomios
+Author: Tu Nombre
+Author-email: tu@correo.com
+Requires-Python: >=3.11
+Dynamic: author
+Dynamic: author-email
+Dynamic: requires-python
+Dynamic: summary

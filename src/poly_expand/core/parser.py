@@ -11,7 +11,7 @@ class Token:
     def __repr__(self):
         return f"Token({self.type!r}, {self.value!r})"
 
-_TOKEN_REGEX = re.compile(r"\s*(?:(\d+)|([A-Za-z]+)|(\^|\*|\+|\-|\(|\)))")
+_TOKEN_REGEX = re.compile(r"\s*(?:(\d+\.\d+|\d+/\d+|\d+)|([A-Za-z]+)|(\^|\*|\+|\-|\(|\)))")
 
 class Parser:
     def __init__(self, text: str):
@@ -22,7 +22,12 @@ class Parser:
         tokens: List[Token] = []
         for num, var, op in _TOKEN_REGEX.findall(text):
             if num:
-                tokens.append(Token("INT", num))
+                if '/' in num:
+                    tokens.append(Token("FRAC", num))
+                elif '.' in num:
+                    tokens.append(Token("FLOAT", num))
+                else:
+                    tokens.append(Token("INT", num))
             elif var:
                 tokens.append(Token("VAR", var))
             else:
@@ -92,6 +97,13 @@ class Parser:
         if tok.type == "INT":
             self._next()
             return Const(int(tok.value))
+        if tok.type == "FLOAT":
+            self._next()
+            return Const(float(tok.value))
+        if tok.type == "FRAC":
+            self._next()
+            num, den = tok.value.split('/')
+            return Const(float(num) / float(den))
         if tok.type == "VAR":
             self._next()
             return Var(tok.value)
@@ -105,5 +117,87 @@ class Parser:
         raise SyntaxError(f"Unexpected token {tok}")
 
 # Función de conveniencia
+
 def parse(text: str) -> Node:
     return Parser(text).parse()
+
+# --- CLI principal ---
+
+def latex_to_algebraic(expr: str) -> str:
+    """
+    Convierte expresiones simples de LaTeX a notación algebraica.
+    Soporta fracciones, paréntesis y potencias.
+    Ejemplo: '\left( \frac{1}{2}x + 3 \right)^2' -> '(1/2*x+3)^2'
+    """
+    import re
+    # 1. Fracciones: \frac{a}{b}x -> (a/b)*x
+    expr = re.sub(r"\\frac\{([^{}]+)\}\{([^{}]+)\}([a-zA-Z])", r"(\1/\2)*\3", expr)
+    # 2. Fracciones solas: \frac{a}{b} -> (a/b)
+    expr = re.sub(r"\\frac\{([^{}]+)\}\{([^{}]+)\}", r"(\1/\2)", expr)
+    # 3. Paréntesis LaTeX: \left( ... \right) -> ( ... )
+    expr = expr.replace(r"\left(", "(").replace(r"\right)", ")")
+    # 4. Eliminar espacios
+    expr = expr.replace(" ", "")
+    # 5. Potencias: x^{2} -> x^2
+    expr = re.sub(r"([a-zA-Z0-9]+)\^\{([0-9]+)\}", r"\1^\2", expr)
+    # 6. Multiplicación implícita: entre número/fracción y variable (ej: (1/2)x -> (1/2)*x, 2x -> 2*x)
+    expr = re.sub(r"(\([^()]+\)|\d+)([a-zA-Z])", r"\1*\2", expr)
+    # 7. Eliminar comandos LaTeX restantes
+    expr = re.sub(r"\\[a-zA-Z]+", "", expr)
+    # 8. Simplificar paréntesis múltiples: (((a/b)*x)+3)^2 -> ((a/b)*x+3)^2
+    expr = re.sub(r"\(\(([^()]+)\)\)", r"(\1)", expr)
+    # 9. Balancear paréntesis: si hay desbalance, agregar los que faltan al final
+    open_par = expr.count('(')
+    close_par = expr.count(')')
+    if open_par > close_par:
+        expr += ')' * (open_par - close_par)
+    elif close_par > open_par:
+        expr = '(' * (close_par - open_par) + expr
+    return expr
+
+def main():
+    import argparse
+    from poly_expand.core.transformer import to_polynomial
+    from poly_expand.export.latex import polynomial_to_latex
+    import sys
+
+    parser = argparse.ArgumentParser(
+        description="Expande productos de polinomios y muestra el resultado en texto y LaTeX."
+    )
+    parser.add_argument(
+        "expresion",
+        nargs="?",
+        help="Expresión polinómica a expandir (ejemplo: (x+1)*(x-1) o LaTeX)"
+    )
+    parser.add_argument(
+        "-l", "--latex", action="store_true", help="Muestra el resultado en formato LaTeX"
+    )
+    args = parser.parse_args()
+
+    # Leer expresión
+    if args.expresion:
+        expr = args.expresion
+    else:
+        print("Introduce la expresión polinómica a expandir:", file=sys.stderr)
+        expr = sys.stdin.readline().strip()
+        if not expr:
+            print("No se recibió ninguna expresión.", file=sys.stderr)
+            sys.exit(1)
+
+    # Detectar si es LaTeX y convertir
+    expr_proc = expr
+    if "\\frac" in expr or "\\left" in expr or "^{" in expr:
+        expr_proc = latex_to_algebraic(expr)
+
+    try:
+        ast = parse(expr_proc)
+        poly = to_polynomial(ast)
+    except Exception as e:
+        print(f"Error al procesar la expresión: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    print("Expansión:")
+    print(poly)
+    if args.latex:
+        print("\nLaTeX:")
+        print(polynomial_to_latex(poly))

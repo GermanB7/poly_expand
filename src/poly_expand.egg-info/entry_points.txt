@@ -1,0 +1,2 @@
+[console_scripts]
+poly-expand = poly_expand.core.parser:main

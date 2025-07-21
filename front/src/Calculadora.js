@@ -7,9 +7,32 @@ export default function Calculadora() {
   const navigate = useNavigate();
   const [inputValue, setInputValue] = useState("");
   const [mostrarResultado, setMostrarResultado] = useState(false);
+  const [resultado, setResultado] = useState("");
+  const [latex, setLatex] = useState("");
+  const [error, setError] = useState("");
 
-  const handleCalcular = () => {
-    setMostrarResultado(true);
+  const handleCalcular = async () => {
+    setMostrarResultado(false);
+    setError("");
+    setResultado("");
+    setLatex("");
+    try {
+      const res = await fetch("http://localhost:5000/expand", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ expression: inputValue })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setResultado(data.result);
+        setLatex(data.latex);
+        setMostrarResultado(true);
+      } else {
+        setError(data.error || "Error desconocido");
+      }
+    } catch (err) {
+      setError("No se pudo conectar con el servidor");
+    }
   };
 
   return (
@@ -34,14 +57,13 @@ export default function Calculadora() {
         </button>
       </div>
 
-       {mostrarResultado && (
+      {error && (
+        <div className="error" style={{ color: 'red', marginTop: '1rem' }}>{error}</div>
+      )}
+      {mostrarResultado && (
         <div className="resultado">
-          <div className="output-texto">{inputValue}</div>
-          <img
-            src={ImgRespuesta}
-            alt="Resultado"
-            className="imagen-respuesta-cuadro"
-          />
+          <div className="output-texto">Expansión: {resultado}</div>
+          <div className="output-latex">LaTeX: <span style={{fontFamily:'monospace'}}>{latex}</span></div>
         </div>
       )}
     </div>
